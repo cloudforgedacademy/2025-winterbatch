@@ -1,4 +1,4 @@
-Here’s a clean, well-formatted **`README.md`** you can use directly in your repository 👇
+
 
 ---
 
@@ -41,13 +41,10 @@ git push origin <your-branch-name>
 
 ### 4️⃣ Create a Pull Request (PR)
 
-* Go to the repository on GitHub.
-* Click **“Compare & pull request”**.
-* Add a short description and submit the PR for review.
 
 ### 5️⃣ Merge the Pull Request (PR)
 
-* Once your PR is approved, merge it into the main branch.
+
 
 ---
 
