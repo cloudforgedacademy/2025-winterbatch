@@ -24,11 +24,7 @@ Follow the steps below to complete your weekly test:
 
 ### 3️⃣ Push the File to Your Branch
 
-```bash
-git add main.tf
-git commit -m "Added main.tf file for weekly test"
-git push origin <your-branch-name>
-```
+
 
 ### 4️⃣ Create a Pull Request (PR)
 
