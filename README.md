@@ -14,22 +14,13 @@ This repository is used to train the **Winter Batch** of **CloudForged Academy**
 Follow the steps below to complete your weekly test:
 
 ### 1️⃣ Clone the Repository and Switch to Your Branch
-```bash
-git clone <repository-url>
-cd <repository-name>
-git checkout -b <your-branch-name>
-````
+
 
 ### 2️⃣ Create a File Called `main.tf`
 
 * Create a file named `main.tf` in your branch.
 * Write a few lines of text or Terraform code inside the file.
-  Example:
 
-  ```hcl
-  # main.tf
-  # This is a test file for CloudForged Academy
-  ```
 
 ### 3️⃣ Push the File to Your Branch
 
