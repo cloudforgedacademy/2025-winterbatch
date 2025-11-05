@@ -1,4 +1,4 @@
 code
 ls list
 cd create dir
-rm remove dir
+rm remove dir 
