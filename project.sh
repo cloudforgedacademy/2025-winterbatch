@@ -1,4 +1,4 @@
-#!/bin/bash
+@#!/bin/bash
 echo "Welcome to the Anson's Bash Toolkit!"
 echo "To Mr Prof"
 
