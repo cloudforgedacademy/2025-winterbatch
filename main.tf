@@ -10,7 +10,7 @@ resource "azurerm_data_factory" "ebun2511" {
 
   tags = {
     environment = "dev"
-     team        = "data"        # ← this is the ONLY change
+    team        = "data" # ← this is the ONLY change
   }
 }
 
