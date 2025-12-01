@@ -3,6 +3,14 @@ resource "azurerm_resource_group" "anson3511" {
   location = "canadacentral"
 }
 
+resource "azurerm_storage_account" "anslem2511" {
+  name                     = "anslemstoragedemo123"
+  resource_group_name      = azurerm_resource_group.anson3511.name
+  location                 = azurerm_resource_group.anson3511.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
 resource "azurerm_data_factory" "ebun2511" {
   name                = "ebun2511"
   location            = azurerm_resource_group.anson3511.location
