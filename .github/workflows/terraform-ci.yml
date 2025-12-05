@@ -2,13 +2,11 @@ name: Terraform CI
 
 on:
   push:
-    paths:
-      - "**/*.tf"
-      - ".github/workflows/terraform-ci.yml"
-  pull_request:
-    paths:
-      - "**/*.tf"
-      - ".github/workflows/terraform-ci.yml"
+    branches:
+      - main
+
+  schedule:
+    - cron: "0 3 * * *"   # Every day at 03:00 UTC
 
 jobs:
   terraform:
