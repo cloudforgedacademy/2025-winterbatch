@@ -6,7 +6,7 @@ on:
       - main
 
   schedule:
-    - cron: "0 3 * * *"   # Every day at 03:00 UTC
+  - cron: "8 8 * * *"   # example for 03:00 EST (03:00 + 5h = 08:00 UTC)
 
 jobs:
   terraform:
