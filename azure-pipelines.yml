@@ -1,0 +1,99 @@
+trigger:
+- main
+
+pool:
+  name: jailbreak-pool
+
+variables:
+  TF_IN_AUTOMATION: "true"
+  ARM_USE_AZURECLI: "true"
+
+stages:
+
+
+- stage: Terraform_Plan
+  displayName: Terraform Plan
+  jobs:
+  - job: Plan
+    displayName: Terraform Plan Job
+    steps:
+    - checkout: self
+
+    - script: terraform --version
+      displayName: Check Terraform version
+
+    - task: AzureCLI@2
+      displayName: Azure Authentication
+      inputs:
+        azureSubscription: cloudx-azure-sc
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "Azure CLI authenticated via Service Connection"
+          az account show
+
+    - task: AzureCLI@2
+      displayName: Terraform Init
+      inputs:
+        azureSubscription: cloudx-azure-sc
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          terraform init -input=false
+
+    - task: AzureCLI@2
+      displayName: Terraform Plan
+      inputs:
+        azureSubscription: cloudx-azure-sc
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          export TF_VAR_admin_password="$(ADMIN_PASSWORD)"
+
+          terraform plan \
+            -input=false \
+            -out=tfplan \
+            -var "resource_group_name=cloudx-rg" \
+            -var "location=canadacentral"
+
+    - publish: tfplan
+      artifact: terraform-plan
+
+
+
+- stage: Terraform_Apply
+  displayName: Terraform Apply (Manual Approval Required)
+  dependsOn: Terraform_Plan
+  condition: succeeded()
+
+  jobs:
+  - deployment: Apply
+    displayName: Terraform Apply Job
+    environment: test
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          - download: current
+            artifact: terraform-plan
+
+          - task: AzureCLI@2
+            displayName: Terraform Apply
+            inputs:
+              azureSubscription: cloudx-azure-sc
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "Listing downloaded plan artifact"
+                ls -l $(Pipeline.Workspace)/terraform-plan
+
+                echo "Copying tfplan into working directory"
+                cp $(Pipeline.Workspace)/terraform-plan/tfplan .
+
+                echo "Initializing Terraform"
+                terraform init -input=false
+
+                echo "Applying Terraform plan"
+                terraform apply -input=false -auto-approve tfplan
