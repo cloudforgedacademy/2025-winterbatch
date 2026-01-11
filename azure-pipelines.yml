@@ -52,10 +52,17 @@ stages:
             -out=tfplan \
             -var "resource_group_name=cloudx-rg" \
             -var "location=canadacentral" \
-            -var "db_password=$(DB_PASSWORD)" \
-            -var "client_secret=$(CLIENT_SECRET)" \
-            -var "tenant_id=$(TENANT_ID)" \
-            -var "object_id=$(OBJECT_ID)"
+            -var "db_password=$DB_PASSWORD" \
+            -var "client_secret=$CLIENT_SECRET" \
+            -var "tenant_id=$TENANT_ID" \
+            -var "object_id=$OBJECT_ID" \
+            -var "key_vault_name=$KEY_VAULT_NAME"
+      env:
+        DB_PASSWORD: $(DB_PASSWORD)
+        CLIENT_SECRET: $(CLIENT_SECRET)
+        TENANT_ID: $(TENANT_ID)
+        OBJECT_ID: $(OBJECT_ID)
+        KEY_VAULT_NAME: $(KEY_VAULT_NAME)
 
     - publish: tfplan
       artifact: terraform-plan
