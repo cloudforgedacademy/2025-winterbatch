@@ -14,56 +14,61 @@ variables:
   ALLOWED_RDP_IP: 0.0.0.0/0
 
 stages:
+# ============================
+# TERRAFORM PLAN STAGE
+# ============================
 - stage: Terraform_Plan
   displayName: Terraform Plan
   jobs:
   - job: Plan
+    displayName: Terraform Plan Job
     steps:
     - checkout: self
 
     - task: AzureCLI@2
-      displayName: Azure Login (Service Connection)
+      displayName: Terraform Plan (Authenticated)
       inputs:
         azureSubscription: cloudx-azure-sc
         scriptType: bash
         scriptLocation: inlineScript
         addSpnToEnvironment: true
         inlineScript: |
-          echo "Logged in with service principal"
-          az account show
+          set -e
 
-          echo "Exporting ARM variables for Terraform"
+          echo "Exporting ARM credentials"
           export ARM_CLIENT_ID=$servicePrincipalId
           export ARM_CLIENT_SECRET=$servicePrincipalKey
           export ARM_TENANT_ID=$tenantId
           export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-    - script: terraform --version
-      displayName: Terraform Version
+          echo "Verifying ARM variables"
+          env | grep ARM_
 
-    - script: terraform init -input=false
-      displayName: Terraform Init
+          terraform --version
+          terraform init -input=false
 
-    - script: |
-        terraform plan \
-          -input=false \
-          -out=tfplan \
-          -var "resource_group_name=$(RESOURCE_GROUP_NAME)" \
-          -var "location=$(LOCATION)" \
-          -var "key_vault_name=$(KEY_VAULT_NAME)" \
-          -var "key_vault_resource_group_name=$(KEY_VAULT_RESOURCE_GROUP)" \
-          -var "allowed_rdp_ip=$(ALLOWED_RDP_IP)"
-      displayName: Terraform Plan
+          terraform plan \
+            -input=false \
+            -out=tfplan \
+            -var "resource_group_name=$(RESOURCE_GROUP_NAME)" \
+            -var "location=$(LOCATION)" \
+            -var "key_vault_name=$(KEY_VAULT_NAME)" \
+            -var "key_vault_resource_group_name=$(KEY_VAULT_RESOURCE_GROUP)" \
+            -var "allowed_rdp_ip=$(ALLOWED_RDP_IP)"
 
     - publish: tfplan
       artifact: terraform-plan
 
+# ============================
+# TERRAFORM APPLY STAGE
+# ============================
 - stage: Terraform_Apply
   displayName: Terraform Apply
   dependsOn: Terraform_Plan
   condition: succeeded()
   jobs:
   - deployment: Apply
+    displayName: Terraform Apply Deployment
     environment: test
     strategy:
       runOnce:
@@ -75,24 +80,22 @@ stages:
             artifact: terraform-plan
 
           - task: AzureCLI@2
-            displayName: Azure Login (Apply)
+            displayName: Terraform Apply (Authenticated)
             inputs:
               azureSubscription: cloudx-azure-sc
               scriptType: bash
               scriptLocation: inlineScript
               addSpnToEnvironment: true
               inlineScript: |
-                az account show
+                set -e
 
                 export ARM_CLIENT_ID=$servicePrincipalId
                 export ARM_CLIENT_SECRET=$servicePrincipalKey
                 export ARM_TENANT_ID=$tenantId
                 export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-          - script: terraform init -input=false
-            displayName: Terraform Init (Apply)
+                terraform init -input=false
 
-          - script: |
-              cp "$(Pipeline.Workspace)/terraform-plan/tfplan" "$(System.DefaultWorkingDirectory)/tfplan"
-              terraform apply -input=false -auto-approve tfplan
-            displayName: Terraform Apply
+                cp "$(Pipeline.Workspace)/terraform-plan/tfplan" "$(System.DefaultWorkingDirectory)/tfplan"
+
+                terraform apply -input=false -auto-approve tfplan
