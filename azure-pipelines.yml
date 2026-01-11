@@ -12,9 +12,9 @@ variables:
   LOCATION: canadacentral
   KEY_VAULT_NAME: cloudx-keyvault3511
   KEY_VAULT_RESOURCE_GROUP: cloud-35-rg
+  ALLOWED_RDP_IP: 0.0.0.0/0
 
 stages:
-
 - stage: Terraform_Plan
   displayName: Terraform Plan
   jobs:
@@ -31,6 +31,9 @@ stages:
         inlineScript: |
           az account show
 
+    - script: terraform --version
+      displayName: Terraform Version
+
     - script: terraform init -input=false
       displayName: Terraform Init
 
@@ -41,7 +44,8 @@ stages:
           -var "resource_group_name=$(RESOURCE_GROUP_NAME)" \
           -var "location=$(LOCATION)" \
           -var "key_vault_name=$(KEY_VAULT_NAME)" \
-          -var "key_vault_resource_group_name=$(KEY_VAULT_RESOURCE_GROUP)"
+          -var "key_vault_resource_group_name=$(KEY_VAULT_RESOURCE_GROUP)" \
+          -var "allowed_rdp_ip=$(ALLOWED_RDP_IP)"
       displayName: Terraform Plan
 
     - publish: tfplan
@@ -51,7 +55,6 @@ stages:
   displayName: Terraform Apply
   dependsOn: Terraform_Plan
   condition: succeeded()
-
   jobs:
   - deployment: Apply
     environment: test
@@ -64,7 +67,25 @@ stages:
           - download: current
             artifact: terraform-plan
 
+          - task: AzureCLI@2
+            displayName: Azure Login
+            inputs:
+              azureSubscription: cloudx-azure-sc
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az account show
+
+          - script: terraform init -input=false
+            displayName: Terraform Init (Apply)
+
           - script: |
-              terraform init -input=false
-              terraform apply -auto-approve tfplan
+              echo "Downloaded artifact contents:"
+              ls -la "$(Pipeline.Workspace)/terraform-plan"
+
+              echo "Copying tfplan into repo working directory"
+              cp "$(Pipeline.Workspace)/terraform-plan/tfplan" "$(System.DefaultWorkingDirectory)/tfplan"
+
+              echo "Applying plan"
+              terraform apply -input=false -auto-approve "$(System.DefaultWorkingDirectory)/tfplan"
             displayName: Terraform Apply
