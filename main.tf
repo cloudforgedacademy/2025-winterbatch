@@ -1,6 +1,31 @@
+data "azurerm_client_config" "current" {}
+
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
+}
+
+resource "azurerm_key_vault" "kv" {
+  name                = var.key_vault_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+
+  soft_delete_retention_days = 7
+  purge_protection_enabled   = false
+}
+
+resource "azurerm_key_vault_secret" "admin_username" {
+  name         = "admin-username"
+  value        = var.admin_username
+  key_vault_id = azurerm_key_vault.kv.id
+}
+
+resource "azurerm_key_vault_secret" "admin_password" {
+  name         = "admin-password"
+  value        = var.admin_password
+  key_vault_id = azurerm_key_vault.kv.id
 }
 
 resource "azurerm_virtual_network" "vnet" {
@@ -35,12 +60,12 @@ resource "azurerm_network_security_group" "vm_nsg" {
   }
 }
 
-resource "azurerm_subnet_network_security_group_association" "cloud_nsg_assoc" {
+resource "azurerm_subnet_network_security_group_association" "nsg_assoc" {
   subnet_id                 = azurerm_subnet.cloud.id
   network_security_group_id = azurerm_network_security_group.vm_nsg.id
 }
 
-resource "azurerm_public_ip" "cloud_pip" {
+resource "azurerm_public_ip" "pip" {
   name                = "public-ip"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -48,7 +73,7 @@ resource "azurerm_public_ip" "cloud_pip" {
   sku                 = "Standard"
 }
 
-resource "azurerm_network_interface" "cloud" {
+resource "azurerm_network_interface" "nic" {
   name                = "vm-nic"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -57,22 +82,20 @@ resource "azurerm_network_interface" "cloud" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.cloud.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.cloud_pip.id
+    public_ip_address_id          = azurerm_public_ip.pip.id
   }
 }
 
-resource "azurerm_windows_virtual_machine" "cloud" {
+resource "azurerm_windows_virtual_machine" "vm" {
   name                = "cloudforged-vm"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   size                = "Standard_F2"
 
-  admin_username = data.azurerm_key_vault_secret.admin_username.value
-  admin_password = data.azurerm_key_vault_secret.admin_password.value
+  admin_username = var.admin_username
+  admin_password = var.admin_password
 
-  network_interface_ids = [
-    azurerm_network_interface.cloud.id
-  ]
+  network_interface_ids = [azurerm_network_interface.nic.id]
 
   os_disk {
     caching              = "ReadWrite"
@@ -85,17 +108,4 @@ resource "azurerm_windows_virtual_machine" "cloud" {
     sku       = "2022-Datacenter"
     version   = "latest"
   }
-}
-
-data "azurerm_client_config" "current" {}
-
-resource "azurerm_key_vault" "kv" {
-  name                = var.key_vault_name
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  sku_name            = "standard"
-
-  soft_delete_retention_days = 7
-  purge_protection_enabled   = false
 }
