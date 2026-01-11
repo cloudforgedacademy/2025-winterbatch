@@ -4,13 +4,26 @@ trigger:
 pool:
   name: jailbreak-pool
 
+# ===================== PIPELINE VARIABLES =====================
+# These MUST be here because VS Code variables are NOT visible to pipelines
 variables:
   TF_IN_AUTOMATION: "true"
   ARM_USE_AZURECLI: "true"
 
+  # Azure / Terraform variables
+  RESOURCE_GROUP_NAME: cloudx-rg
+  LOCATION: canadacentral
+
+  # Existing Key Vault (NAME ONLY, NOT URL)
+  KEY_VAULT_NAME: cloudx-keyvault3511
+  KEY_VAULT_RESOURCE_GROUP: cloud-35-rg
+
+# ===================== STAGES =====================
 stages:
 
-# ===================== PLAN STAGE =====================
+# =================================================
+# TERRAFORM PLAN
+# =================================================
 - stage: Terraform_Plan
   displayName: Terraform Plan
   jobs:
@@ -29,6 +42,7 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
+          echo "Azure authenticated"
           az account show
 
     - task: AzureCLI@2
@@ -47,27 +61,30 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
+          echo "RESOURCE_GROUP_NAME=$RESOURCE_GROUP_NAME"
+          echo "LOCATION=$LOCATION"
+          echo "KEY_VAULT_NAME=$KEY_VAULT_NAME"
+          echo "KEY_VAULT_RESOURCE_GROUP=$KEY_VAULT_RESOURCE_GROUP"
+
           terraform plan \
             -input=false \
             -out=tfplan \
-            -var "resource_group_name=cloudx-rg" \
-            -var "location=canadacentral" \
-            -var "db_password=$DB_PASSWORD" \
-            -var "client_secret=$CLIENT_SECRET" \
-            -var "tenant_id=$TENANT_ID" \
-            -var "object_id=$OBJECT_ID" \
-            -var "key_vault_name=$KEY_VAULT_NAME"
+            -var "resource_group_name=$RESOURCE_GROUP_NAME" \
+            -var "location=$LOCATION" \
+            -var "key_vault_name=$KEY_VAULT_NAME" \
+            -var "key_vault_resource_group_name=$KEY_VAULT_RESOURCE_GROUP"
       env:
-        DB_PASSWORD: $(DB_PASSWORD)
-        CLIENT_SECRET: $(CLIENT_SECRET)
-        TENANT_ID: $(TENANT_ID)
-        OBJECT_ID: $(OBJECT_ID)
+        RESOURCE_GROUP_NAME: $(RESOURCE_GROUP_NAME)
+        LOCATION: $(LOCATION)
         KEY_VAULT_NAME: $(KEY_VAULT_NAME)
+        KEY_VAULT_RESOURCE_GROUP: $(KEY_VAULT_RESOURCE_GROUP)
 
     - publish: tfplan
       artifact: terraform-plan
 
-# ===================== APPLY STAGE =====================
+# =================================================
+# TERRAFORM APPLY (MANUAL APPROVAL)
+# =================================================
 - stage: Terraform_Apply
   displayName: Terraform Apply (Manual Approval Required)
   dependsOn: Terraform_Plan
@@ -93,5 +110,7 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
+                echo "Applying Terraform plan"
+                cp $(Pipeline.Workspace)/terraform-plan/tfplan .
                 terraform init -input=false
                 terraform apply -input=false -auto-approve tfplan
