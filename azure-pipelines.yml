@@ -29,8 +29,15 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
-          echo "Azure CLI authenticated via Service Connection"
-          az account show
+          terraform plan \
+        -input=false \
+        -out=tfplan \
+        -var "resource_group_name=cloudx-rg" \
+        -var "location=canadacentral" \
+        -var "db_password=$(DB_PASSWORD)" \
+        -var "client_secret=$(CLIENT_SECRET)" \
+        -var "tenant_id=$(TENANT_ID)" \
+        -var "object_id=$(OBJECT_ID)"
 
     - task: AzureCLI@2
       displayName: Terraform Init
