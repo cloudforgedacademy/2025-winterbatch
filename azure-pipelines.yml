@@ -6,7 +6,6 @@ pool:
 
 variables:
   TF_IN_AUTOMATION: "true"
-  ARM_USE_AZURECLI: "true"
 
   RESOURCE_GROUP_NAME: cloudx-rg
   LOCATION: canadacentral
@@ -23,13 +22,21 @@ stages:
     - checkout: self
 
     - task: AzureCLI@2
-      displayName: Terraform Plan (Authenticated)
+      displayName: Azure Login (Service Connection)
       inputs:
         azureSubscription: cloudx-azure-sc
         scriptType: bash
         scriptLocation: inlineScript
+        addSpnToEnvironment: true
         inlineScript: |
+          echo "Logged in with service principal"
           az account show
+
+          echo "Exporting ARM variables for Terraform"
+          export ARM_CLIENT_ID=$servicePrincipalId
+          export ARM_CLIENT_SECRET=$servicePrincipalKey
+          export ARM_TENANT_ID=$tenantId
+          export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
     - script: terraform --version
       displayName: Terraform Version
@@ -68,24 +75,24 @@ stages:
             artifact: terraform-plan
 
           - task: AzureCLI@2
-            displayName: Azure Login
+            displayName: Azure Login (Apply)
             inputs:
               azureSubscription: cloudx-azure-sc
               scriptType: bash
               scriptLocation: inlineScript
+              addSpnToEnvironment: true
               inlineScript: |
                 az account show
+
+                export ARM_CLIENT_ID=$servicePrincipalId
+                export ARM_CLIENT_SECRET=$servicePrincipalKey
+                export ARM_TENANT_ID=$tenantId
+                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
           - script: terraform init -input=false
             displayName: Terraform Init (Apply)
 
           - script: |
-              echo "Downloaded artifact contents:"
-              ls -la "$(Pipeline.Workspace)/terraform-plan"
-
-              echo "Copying tfplan into repo working directory"
               cp "$(Pipeline.Workspace)/terraform-plan/tfplan" "$(System.DefaultWorkingDirectory)/tfplan"
-
-              echo "Applying plan"
-              terraform apply -input=false -auto-approve "$(System.DefaultWorkingDirectory)/tfplan"
+              terraform apply -input=false -auto-approve tfplan
             displayName: Terraform Apply
