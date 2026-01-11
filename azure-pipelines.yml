@@ -7,20 +7,20 @@ pool:
 variables:
   TF_IN_AUTOMATION: "true"
 
+  # Terraform variables
   RESOURCE_GROUP_NAME: cloudx-rg
   LOCATION: canadacentral
-
   KEY_VAULT_NAME: cloudx-keyvault3511
-  KEY_VAULT_RESOURCE_GROUP: cloud-35-rg
-
-  # IMPORTANT: safer would be your public IP /32, but keeping your current value
   ALLOWED_RDP_IP: 0.0.0.0/0
 
-  # Secret names in Key Vault (must exist exactly with these names)
-  ADMIN_USERNAME_SECRET_NAME: admin-username
-  ADMIN_PASSWORD_SECRET_NAME: admin-password
+  # VM credentials (SET THESE AS SECRET VARIABLES IN AZURE DEVOPS UI)
+  ADMIN_USERNAME: azureadmin
+  ADMIN_PASSWORD: StrongPassword!123
 
 stages:
+# ============================
+# TERRAFORM PLAN
+# ============================
 - stage: Terraform_Plan
   displayName: Terraform Plan
   jobs:
@@ -39,17 +39,16 @@ stages:
         inlineScript: |
           set -e
 
-          echo "Exporting ARM credentials for Terraform"
+          echo "Setting ARM credentials"
           export ARM_CLIENT_ID="$servicePrincipalId"
           export ARM_CLIENT_SECRET="$servicePrincipalKey"
           export ARM_TENANT_ID="$tenantId"
           export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
 
-          echo "Confirm ARM variables exist (values may be masked)"
+          echo "ARM variables detected"
           env | grep '^ARM_' || true
 
           terraform --version
-
           terraform init -input=false
 
           terraform plan \
@@ -58,71 +57,11 @@ stages:
             -var "resource_group_name=$(RESOURCE_GROUP_NAME)" \
             -var "location=$(LOCATION)" \
             -var "key_vault_name=$(KEY_VAULT_NAME)" \
-            -var "key_vault_resource_group_name=$(KEY_VAULT_RESOURCE_GROUP)" \
             -var "allowed_rdp_ip=$(ALLOWED_RDP_IP)" \
-            -var "admin_username_secret_name=$(ADMIN_USERNAME_SECRET_NAME)" \
-            -var "admin_password_secret_name=$(ADMIN_PASSWORD_SECRET_NAME)"
+            -var "admin_username=$(ADMIN_USERNAME)" \
+            -var "admin_password=$(ADMIN_PASSWORD)"
 
-          echo "Staging artifacts"
           mkdir -p "$(Build.ArtifactStagingDirectory)/tf"
-          cp -f tfplan "$(Build.ArtifactStagingDirectory)/tf/tfplan"
-          if [ -f ".terraform.lock.hcl" ]; then cp -f .terraform.lock.hcl "$(Build.ArtifactStagingDirectory)/tf/.terraform.lock.hcl"; fi
-          if [ -f "terraform.tfstate" ]; then cp -f terraform.tfstate "$(Build.ArtifactStagingDirectory)/tf/terraform.tfstate"; fi
-          if [ -f "terraform.tfstate.backup" ]; then cp -f terraform.tfstate.backup "$(Build.ArtifactStagingDirectory)/tf/terraform.tfstate.backup"; fi
-
-    - publish: $(Build.ArtifactStagingDirectory)/tf
-      artifact: terraform-plan
-
-- stage: Terraform_Apply
-  displayName: Terraform Apply
-  dependsOn: Terraform_Plan
-  condition: succeeded()
-  jobs:
-  - deployment: Apply
-    displayName: Terraform Apply Deployment
-    environment: test
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-
-          - download: current
-            artifact: terraform-plan
-
-          - task: AzureCLI@2
-            displayName: Terraform Apply (Authenticated)
-            inputs:
-              azureSubscription: cloudx-azure-sc
-              scriptType: bash
-              scriptLocation: inlineScript
-              addSpnToEnvironment: true
-              inlineScript: |
-                set -e
-
-                export ARM_CLIENT_ID="$servicePrincipalId"
-                export ARM_CLIENT_SECRET="$servicePrincipalKey"
-                export ARM_TENANT_ID="$tenantId"
-                export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
-
-                echo "Restoring artifacts"
-                ls -la "$(Pipeline.Workspace)/terraform-plan" || true
-
-                cp -f "$(Pipeline.Workspace)/terraform-plan/tfplan" "$(System.DefaultWorkingDirectory)/tfplan"
-
-                if [ -f "$(Pipeline.Workspace)/terraform-plan/.terraform.lock.hcl" ]; then
-                  cp -f "$(Pipeline.Workspace)/terraform-plan/.terraform.lock.hcl" "$(System.DefaultWorkingDirectory)/.terraform.lock.hcl"
-                fi
-
-                if [ -f "$(Pipeline.Workspace)/terraform-plan/terraform.tfstate" ]; then
-                  cp -f "$(Pipeline.Workspace)/terraform-plan/terraform.tfstate" "$(System.DefaultWorkingDirectory)/terraform.tfstate"
-                fi
-
-                if [ -f "$(Pipeline.Workspace)/terraform-plan/terraform.tfstate.backup" ]; then
-                  cp -f "$(Pipeline.Workspace)/terraform-plan/terraform.tfstate.backup" "$(System.DefaultWorkingDirectory)/terraform.tfstate.backup"
-                fi
-
-                terraform --version
-                terraform init -input=false
-
-                terraform apply -input=false -auto-approve tfplan
+          cp tfplan "$(Build.ArtifactStagingDirectory)/tf/tfplan"
+          if [ -f .terraform.lock.hcl ]; then cp .terraform.lock.hcl "$(Build.ArtifactStagingDirectory)/tf/.terraform.lock.hcl"; fi
+          if [ -f terraform.tfstate ]; then cp terraform.tfsta
