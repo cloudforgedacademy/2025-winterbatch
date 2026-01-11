@@ -10,7 +10,7 @@ variables:
 
 stages:
 
-
+# ===================== PLAN STAGE =====================
 - stage: Terraform_Plan
   displayName: Terraform Plan
   jobs:
@@ -29,15 +29,7 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
-          terraform plan \
-        -input=false \
-        -out=tfplan \
-        -var "resource_group_name=cloudx-rg" \
-        -var "location=canadacentral" \
-        -var "db_password=$(DB_PASSWORD)" \
-        -var "client_secret=$(CLIENT_SECRET)" \
-        -var "tenant_id=$(TENANT_ID)" \
-        -var "object_id=$(OBJECT_ID)"
+          az account show
 
     - task: AzureCLI@2
       displayName: Terraform Init
@@ -55,19 +47,20 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
-          export TF_VAR_admin_password="$(ADMIN_PASSWORD)"
-
           terraform plan \
             -input=false \
             -out=tfplan \
             -var "resource_group_name=cloudx-rg" \
-            -var "location=canadacentral"
+            -var "location=canadacentral" \
+            -var "db_password=$(DB_PASSWORD)" \
+            -var "client_secret=$(CLIENT_SECRET)" \
+            -var "tenant_id=$(TENANT_ID)" \
+            -var "object_id=$(OBJECT_ID)"
 
     - publish: tfplan
       artifact: terraform-plan
 
-
-
+# ===================== APPLY STAGE =====================
 - stage: Terraform_Apply
   displayName: Terraform Apply (Manual Approval Required)
   dependsOn: Terraform_Plan
@@ -93,14 +86,5 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                echo "Listing downloaded plan artifact"
-                ls -l $(Pipeline.Workspace)/terraform-plan
-
-                echo "Copying tfplan into working directory"
-                cp $(Pipeline.Workspace)/terraform-plan/tfplan .
-
-                echo "Initializing Terraform"
                 terraform init -input=false
-
-                echo "Applying Terraform plan"
                 terraform apply -input=false -auto-approve tfplan
