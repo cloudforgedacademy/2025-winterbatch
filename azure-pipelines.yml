@@ -12,7 +12,7 @@ variables:
   KEY_VAULT_NAME: cloudx-keyvault3511
   ALLOWED_RDP_IP: 0.0.0.0/0
 
-  # These MUST be set as SECRET variables in Azure DevOps UI
+  
   ADMIN_USERNAME: azureadmin
   ADMIN_PASSWORD: StrongPassword!123
 
