@@ -5,29 +5,6 @@ resource "azurerm_resource_group" "rg" {
   location = var.location
 }
 
-resource "azurerm_key_vault" "kv" {
-  name                = var.key_vault_name
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  sku_name            = "standard"
-
-  soft_delete_retention_days = 7
-  purge_protection_enabled   = false
-}
-
-resource "azurerm_key_vault_secret" "admin_username" {
-  name         = "admin-username"
-  value        = var.admin_username
-  key_vault_id = azurerm_key_vault.kv.id
-}
-
-resource "azurerm_key_vault_secret" "admin_password" {
-  name         = "admin-password"
-  value        = var.admin_password
-  key_vault_id = azurerm_key_vault.kv.id
-}
-
 resource "azurerm_virtual_network" "vnet" {
   name                = "unique-vnet"
   address_space       = ["10.0.0.0/16"]
@@ -49,12 +26,12 @@ resource "azurerm_network_security_group" "vm_nsg" {
 
   security_rule {
     name                       = "allow-rdp"
-    priority                   = 100
+    priority                   = 1001
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "3389"
+    destination_port_range     = "80"
     source_address_prefix      = var.allowed_rdp_ip
     destination_address_prefix = "*"
   }
@@ -92,8 +69,8 @@ resource "azurerm_windows_virtual_machine" "vm" {
   location            = azurerm_resource_group.rg.location
   size                = "Standard_F2"
 
-  admin_username = var.admin_username
-  admin_password = var.admin_password
+  admin_username = data.azurerm_key_vault_secret.admin_username.value
+  admin_password = data.azurerm_key_vault_secret.admin_password.value
 
   network_interface_ids = [azurerm_network_interface.nic.id]
 
@@ -111,16 +88,15 @@ resource "azurerm_windows_virtual_machine" "vm" {
 }
 
 resource "azurerm_virtual_machine_extension" "web_server_install" {
-  name                       = "web-server-install"
-  virtual_machine_id         = azurerm_windows_virtual_machine.vm.id
-  publisher                  = "Microsoft.Compute"
-  type                       = "CustomScriptExtension"
-  type_handler_version       = "1.10"
-  auto_upgrade_minor_version = true
+  name                 = "install-iis"
+  virtual_machine_id   = azurerm_windows_virtual_machine.vm.id
+  publisher            = "Microsoft.Compute"
+  type                 = "CustomScriptExtension"
+  type_handler_version = "1.10"
 
   settings = <<SETTINGS
-    {
-        "commandToExecute": "powershell -Command \\"Install-WindowsFeature -name Web-Server -IncludeManagementTools\\""
-    }
-  SETTINGS
+{
+  "commandToExecute": "powershell -Command \"Install-WindowsFeature -Name Web-Server -IncludeManagementTools\""
+}
+SETTINGS
 }
